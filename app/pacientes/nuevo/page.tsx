@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, Button, Input, Textarea } from '@/components/ui';
+import { usePacientes } from '@/lib/hooks';
 import { GrupoAlimentario, DolenciaTipo } from '@/types';
 import { 
   User, 
@@ -61,8 +62,10 @@ const ingestaTipos = ['desayuno', 'almuerzo', 'comida', 'merienda', 'cena'] as c
 
 export default function NuevoPacientePage() {
   const router = useRouter();
+  const { createPaciente } = usePacientes();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     // Datos personales
@@ -156,9 +159,69 @@ export default function NuevoPacientePage() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    // Simular guardado
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    router.push('/pacientes');
+    setError(null);
+
+    try {
+      // Mapear datos del formulario a la estructura de Supabase
+      const pacienteData = {
+        nombre: formData.nombre,
+        dni: formData.dni,
+        telefono: formData.telefono,
+        fecha_nacimiento: formData.fechaNacimiento,
+        email: formData.email,
+        direccion: formData.direccion,
+        codigo_postal: formData.codigoPostal,
+        localidad: formData.localidad,
+        grupos_alimentarios: formData.gruposSeleccionados,
+        ingestas: formData.ingestas,
+        recomendado_por: formData.recomendadoPor || null,
+        agua_diaria: formData.aguaDiaria || null,
+        otros_liquidos: formData.otrosLiquidos || null,
+        habitos_alimenticios: formData.habitosAlimenticios || null,
+        cansancio_dia: formData.cansancioDia || null,
+        problemas_digestion: formData.problemasDigestion || null,
+        peso_ideal: formData.pesoIdeal || null,
+        deporte: {
+          practica: formData.practicaDeporte,
+          cual: formData.deporteCual,
+          frecuencia: formData.deporteFrecuencia,
+        },
+        calidad_sueno: formData.calidadSueno || null,
+        dieta_anterior: formData.dietaAnterior || null,
+        estado_salud: formData.estadoSalud || null,
+        dolencias: formData.dolenciasSeleccionadas.map(d => ({ tipo: d, activa: true })),
+        medicamentos: formData.medicamentos.map((m, idx) => ({
+          id: idx.toString(),
+          farmaco: m.farmaco,
+          dosis: m.dosis,
+          motivo: m.motivo,
+          tiempo: m.tiempo,
+        })),
+        trabajo: {
+          activo: formData.trabajaActualmente,
+          tipo: formData.tipoTrabajo,
+          horario: formData.horarioTrabajo,
+        },
+        estres: {
+          nivel: formData.nivelEstres,
+          motivo: formData.motivoEstres,
+          afectaSalud: formData.estresAfectaSalud,
+        },
+        activo: true,
+      };
+
+      const nuevoPaciente = await createPaciente(pacienteData);
+      
+      if (nuevoPaciente) {
+        router.push('/pacientes');
+      } else {
+        setError('Error al guardar el paciente. Intenta de nuevo.');
+        setIsSubmitting(false);
+      }
+    } catch (err) {
+      setError('Error inesperado al guardar');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -197,6 +260,13 @@ export default function NuevoPacientePage() {
           ))}
         </div>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <Card className="mb-6 p-4 bg-danger-light border border-danger">
+          <p className="text-danger">{error}</p>
+        </Card>
+      )}
 
       {/* Form Steps */}
       <Card className="mb-6">

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, Button, Input, Badge } from '@/components/ui';
-import { herramientasMock } from '@/lib/mock-data';
-import { HerramientaAprendizaje } from '@/types';
+import { useHerramientas } from '@/lib/hooks';
 import { formatDate } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
 import { 
   Plus, 
   Search, 
@@ -34,54 +34,51 @@ const tipoColores: Record<string, string> = {
 };
 
 export default function HerramientasPage() {
-  const [herramientas, setHerramientas] = useState(herramientasMock);
+  const { herramientas, loading, error, createHerramienta, updateHerramienta, deleteHerramienta } = useHerramientas();
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     titulo: '',
     descripcion: '',
-    tipo: 'pdf' as HerramientaAprendizaje['tipo'],
+    tipo: 'pdf' as 'pdf' | 'video' | 'articulo' | 'infografia',
     url: '',
     categoria: '',
   });
 
-  const filteredHerramientas = herramientas.filter(h =>
-    h.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    h.categoria.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredHerramientas = useMemo(() => {
+    if (!herramientas) return [];
+    return herramientas.filter(h =>
+      h.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      h.categoria.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [herramientas, searchTerm]);
 
-  const categorias = [...new Set(herramientas.map(h => h.categoria))];
+  const categorias = useMemo(() => {
+    if (!herramientas) return [];
+    return [...new Set(herramientas.map(h => h.categoria))];
+  }, [herramientas]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (editingId) {
-      setHerramientas(prev => prev.map(h => 
-        h.id === editingId 
-          ? { ...h, ...formData }
-          : h
-      ));
+      await updateHerramienta(editingId, formData);
     } else {
-      const newHerramienta: HerramientaAprendizaje = {
-        id: Date.now().toString(),
-        ...formData,
-        fechaCreacion: new Date().toISOString(),
-      };
-      setHerramientas(prev => [...prev, newHerramienta]);
+      await createHerramienta(formData);
     }
     closeModal();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('¿Estás seguro de que quieres eliminar esta herramienta?')) {
-      setHerramientas(prev => prev.filter(h => h.id !== id));
+      await deleteHerramienta(id);
     }
   };
 
-  const openEditModal = (herramienta: HerramientaAprendizaje) => {
+  const openEditModal = (herramienta: typeof herramientas[0]) => {
     setFormData({
       titulo: herramienta.titulo,
-      descripcion: herramienta.descripcion,
-      tipo: herramienta.tipo,
+      descripcion: herramienta.descripcion || '',
+      tipo: herramienta.tipo as 'pdf' | 'video' | 'articulo' | 'infografia',
       url: herramienta.url,
       categoria: herramienta.categoria,
     });
@@ -100,6 +97,22 @@ export default function HerramientasPage() {
       categoria: '',
     });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="p-6 text-center">
+        <p className="text-danger mb-4">Error: {error}</p>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -171,7 +184,7 @@ export default function HerramientasPage() {
                   {herramienta.tipo.toUpperCase()}
                 </Badge>
                 <span className="text-xs text-muted">
-                  {formatDate(herramienta.fechaCreacion)}
+                  {formatDate(herramienta.created_at)}
                 </span>
               </div>
 
@@ -261,7 +274,7 @@ export default function HerramientasPage() {
                   </label>
                   <select
                     value={formData.tipo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, tipo: e.target.value as HerramientaAprendizaje['tipo'] }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, tipo: e.target.value as 'pdf' | 'video' | 'articulo' | 'infografia' }))}
                     className="w-full px-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary-light"
                   >
                     <option value="pdf">PDF</option>

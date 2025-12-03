@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, Button, Input, Badge } from '@/components/ui';
-import { pacientesMock } from '@/lib/mock-data';
+import { usePacientes } from '@/lib/hooks';
 import { formatDate, calcularEdad } from '@/lib/utils';
 import { 
   Plus, 
@@ -13,18 +13,40 @@ import {
   Mail,
   Phone,
   MapPin,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 
 export default function PacientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const { pacientes, loading, error } = usePacientes();
 
-  const filteredPacientes = pacientesMock.filter(p => 
-    p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.localidad.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPacientes = useMemo(() => {
+    if (!pacientes) return [];
+    return pacientes.filter(p => 
+      p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.localidad || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [pacientes, searchTerm]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="p-6 text-center">
+        <p className="text-danger mb-4">Error: {error}</p>
+        <p className="text-sm text-muted">Verifica la conexión con Supabase</p>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -141,7 +163,7 @@ export default function PacientesPage() {
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-foreground">
-                        {calcularEdad(paciente.fechaNacimiento)} años
+                        {calcularEdad(paciente.fecha_nacimiento)} años
                       </p>
                     </td>
                     <td className="px-6 py-4">
@@ -151,7 +173,7 @@ export default function PacientesPage() {
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-muted">
-                        {formatDate(paciente.fechaRegistro)}
+                        {formatDate(paciente.created_at)}
                       </p>
                     </td>
                     <td className="px-6 py-4">
@@ -213,10 +235,10 @@ export default function PacientesPage() {
 
                 <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
                   <span className="text-xs text-muted">
-                    {calcularEdad(paciente.fechaNacimiento)} años
+                    {calcularEdad(paciente.fecha_nacimiento)} años
                   </span>
                   <span className="text-xs text-muted">
-                    Desde {formatDate(paciente.fechaRegistro)}
+                    Desde {formatDate(paciente.created_at)}
                   </span>
                 </div>
               </Card>
@@ -227,7 +249,7 @@ export default function PacientesPage() {
 
       {/* Results count */}
       <p className="text-sm text-muted">
-        Mostrando {filteredPacientes.length} de {pacientesMock.length} pacientes
+        Mostrando {filteredPacientes.length} de {pacientes.length} pacientes
       </p>
     </div>
   );

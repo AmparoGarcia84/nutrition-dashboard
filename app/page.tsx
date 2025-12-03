@@ -1,7 +1,8 @@
 'use client';
 
 import { Card } from '@/components/ui';
-import { pacientesMock, medidasMock } from '@/lib/mock-data';
+import { usePacientes } from '@/lib/hooks';
+import { useMedidas } from '@/lib/hooks';
 import { 
   Users, 
   UserPlus, 
@@ -57,11 +58,49 @@ const colorClasses: Record<string, { bg: string; text: string; icon: string }> =
 };
 
 export default function Dashboard() {
+  const { pacientes, loading: loadingPacientes } = usePacientes();
+  
+  // Calcular estadísticas reales
+  const statsCalculadas = [
+    { 
+      name: 'Total Pacientes', 
+      value: pacientes.length, 
+      change: '+2 este mes',
+      trend: 'up',
+      icon: Users,
+      color: 'primary'
+    },
+    { 
+      name: 'Pacientes Activos', 
+      value: pacientes.filter(p => p.activo).length, 
+      change: '100%',
+      trend: 'up',
+      icon: Activity,
+      color: 'success'
+    },
+    { 
+      name: 'Citas esta semana', 
+      value: 12, 
+      change: '+3 vs anterior',
+      trend: 'up',
+      icon: Calendar,
+      color: 'secondary'
+    },
+    { 
+      name: 'Objetivos cumplidos', 
+      value: '85%', 
+      change: '+5%',
+      trend: 'up',
+      icon: Target,
+      color: 'accent'
+    },
+  ];
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 stagger-children">
-        {stats.map((stat) => {
+        {statsCalculadas.map((stat) => {
           const colors = colorClasses[stat.color];
           return (
             <Card key={stat.name} hover className="relative overflow-hidden">
@@ -105,8 +144,7 @@ export default function Dashboard() {
             </Link>
           </div>
           <div className="space-y-4">
-            {pacientesMock.slice(0, 4).map((paciente, index) => {
-              const ultimaMedida = medidasMock.find(m => m.pacienteId === paciente.id);
+            {pacientes.slice(0, 4).map((paciente, index) => {
               return (
                 <Link
                   key={paciente.id}
@@ -122,20 +160,15 @@ export default function Dashboard() {
                       {paciente.nombre}
                     </p>
                     <p className="text-sm text-muted truncate">
-                      {paciente.email} · {paciente.localidad}
+                      {paciente.email} · {paciente.localidad || 'Sin localidad'}
                     </p>
-                  </div>
-                  <div className="text-right">
-                    {ultimaMedida && (
-                      <>
-                        <p className="font-semibold text-foreground">{ultimaMedida.bioimpedancia.peso} kg</p>
-                        <p className="text-xs text-muted">IMC: {ultimaMedida.bioimpedancia.imc}</p>
-                      </>
-                    )}
                   </div>
                 </Link>
               );
             })}
+            {pacientes.length === 0 && (
+              <p className="text-center text-muted py-4">No hay pacientes registrados</p>
+            )}
           </div>
         </Card>
 

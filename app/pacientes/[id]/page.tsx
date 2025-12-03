@@ -3,9 +3,10 @@
 import { use, useState } from 'react';
 import Link from 'next/link';
 import { Card, Button, Badge } from '@/components/ui';
-import { pacientesMock, medidasMock, biomarcadoresMock, herramientasMock } from '@/lib/mock-data';
+import { usePaciente, useMedidas, useBiomarcadores, useHerramientas } from '@/lib/hooks';
 import { BIOMARCADORES_INFO } from '@/types';
 import { formatDate, calcularEdad } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
 import { 
   ArrowLeft,
   Utensils,
@@ -56,9 +57,18 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
   const [activeTab, setActiveTab] = useState('medidas');
   const [medidaSeccion, setMedidaSeccion] = useState<'bioimpedancia' | 'segmental' | 'plicometria' | 'antropometria'>('bioimpedancia');
   
-  const paciente = pacientesMock.find(p => p.id === resolvedParams.id);
-  const medidas = medidasMock.filter(m => m.pacienteId === resolvedParams.id);
-  const biomarcadores = biomarcadoresMock.filter(b => b.pacienteId === resolvedParams.id);
+  const { paciente, loading: loadingPaciente } = usePaciente(resolvedParams.id);
+  const { medidas, loading: loadingMedidas } = useMedidas(resolvedParams.id);
+  const { biomarcadores, loading: loadingBiomarcadores } = useBiomarcadores(resolvedParams.id);
+  const { herramientas } = useHerramientas();
+
+  if (loadingPaciente) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!paciente) {
     return (
@@ -71,15 +81,16 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
     );
   }
 
-  const ultimaMedida = medidas[medidas.length - 1];
-  const primeraMedida = medidas[0];
-  const cambiosPeso = ultimaMedida && primeraMedida 
-    ? (ultimaMedida.bioimpedancia.peso - primeraMedida.bioimpedancia.peso).toFixed(1)
+  const ultimaMedida = medidas && medidas.length > 0 ? medidas[0] : null;
+  const primeraMedida = medidas && medidas.length > 0 ? medidas[medidas.length - 1] : null;
+  
+  const cambiosPeso = ultimaMedida && primeraMedida && ultimaMedida.bioimpedancia && primeraMedida.bioimpedancia
+    ? ((ultimaMedida.bioimpedancia as any).peso - (primeraMedida.bioimpedancia as any).peso).toFixed(1)
     : '0';
 
   // Datos para el gráfico de radar de biomarcadores
-  const radarData = biomarcadores.map(bio => ({
-    nombre: BIOMARCADORES_INFO[bio.tipo].nombre.split(' ')[0],
+  const radarData = (biomarcadores || []).map(bio => ({
+    nombre: BIOMARCADORES_INFO[bio.tipo as keyof typeof BIOMARCADORES_INFO]?.nombre.split(' ')[0] || bio.tipo,
     valor: bio.porcentaje,
     fullMark: 100,
   }));
@@ -140,7 +151,7 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
               </div>
               <div>
                 <p className="text-muted text-xs">Localidad</p>
-                <p className="text-foreground font-medium">{paciente.localidad}</p>
+                <p className="text-foreground font-medium">{paciente.localidad || 'Sin localidad'}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 text-sm">
@@ -149,21 +160,21 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
               </div>
               <div>
                 <p className="text-muted text-xs">Edad</p>
-                <p className="text-foreground font-medium">{calcularEdad(paciente.fechaNacimiento)} años</p>
+                <p className="text-foreground font-medium">{calcularEdad(paciente.fecha_nacimiento)} años</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Quick stats */}
-        {ultimaMedida && (
+        {ultimaMedida && ultimaMedida.bioimpedancia && (
           <div className="mt-6 pt-6 border-t border-border grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-foreground">{ultimaMedida.bioimpedancia.peso} kg</p>
+              <p className="text-2xl font-bold text-foreground">{(ultimaMedida.bioimpedancia as any).peso} kg</p>
               <p className="text-sm text-muted">Peso actual</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-foreground">{ultimaMedida.bioimpedancia.imc}</p>
+              <p className="text-2xl font-bold text-foreground">{(ultimaMedida.bioimpedancia as any).imc}</p>
               <p className="text-sm text-muted">IMC</p>
             </div>
             <div className="text-center">
@@ -246,10 +257,10 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
                   Nueva Medida
                 </Button>
               </div>
-              {medidas.length > 0 ? (
+              {medidas && medidas.length > 0 ? (
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={medidas.map(m => ({ ...m, peso: m.bioimpedancia.peso }))}>
+                    <AreaChart data={medidas.map(m => ({ ...m, fecha: m.fecha, peso: (m.bioimpedancia as any)?.peso || 0 }))}>
                       <defs>
                         <linearGradient id="colorPeso" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#69956D" stopOpacity={0.3}/>
@@ -358,57 +369,64 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {medidas.map((medida) => (
-                      <tr key={medida.id} className="table-row-hover">
-                        <td className="px-4 py-3 font-medium">{formatDate(medida.fecha)}</td>
-                        {medidaSeccion === 'bioimpedancia' && (
-                          <>
-                            <td className="text-center px-3 py-3">{medida.bioimpedancia.peso} kg</td>
-                            <td className="text-center px-3 py-3">{medida.bioimpedancia.grasaSubcutanea}%</td>
-                            <td className="text-center px-3 py-3">{medida.bioimpedancia.agua}%</td>
-                            <td className="text-center px-3 py-3">{medida.bioimpedancia.musculo} kg</td>
-                            <td className="text-center px-3 py-3">{medida.bioimpedancia.metabolismoBasal}</td>
-                            <td className="text-center px-3 py-3">{medida.bioimpedancia.edadMetabolica}</td>
-                            <td className="text-center px-3 py-3">{medida.bioimpedancia.grasaVisceral}</td>
-                            <td className="text-center px-3 py-3">{medida.bioimpedancia.azucarSangre}</td>
-                            <td className="text-center px-3 py-3">{medida.bioimpedancia.tension}</td>
-                            <td className="text-center px-3 py-3 font-semibold">{medida.bioimpedancia.imc}</td>
-                          </>
-                        )}
-                        {medidaSeccion === 'segmental' && (
-                          <>
-                            <td className="text-center px-3 py-3">{medida.segmental.brazoIzq.kg}kg / {medida.segmental.brazoIzq.porcentaje}%</td>
-                            <td className="text-center px-3 py-3">{medida.segmental.brazoDer.kg}kg / {medida.segmental.brazoDer.porcentaje}%</td>
-                            <td className="text-center px-3 py-3">{medida.segmental.tronco.kg}kg / {medida.segmental.tronco.porcentaje}%</td>
-                            <td className="text-center px-3 py-3">{medida.segmental.piernaIzq.kg}kg / {medida.segmental.piernaIzq.porcentaje}%</td>
-                            <td className="text-center px-3 py-3">{medida.segmental.piernaDer.kg}kg / {medida.segmental.piernaDer.porcentaje}%</td>
-                          </>
-                        )}
-                        {medidaSeccion === 'plicometria' && (
-                          <>
-                            <td className="text-center px-3 py-3">{medida.plicometria.bicipital}</td>
-                            <td className="text-center px-3 py-3">{medida.plicometria.tricipital}</td>
-                            <td className="text-center px-3 py-3">{medida.plicometria.subEscapular}</td>
-                            <td className="text-center px-3 py-3">{medida.plicometria.abdominal}</td>
-                            <td className="text-center px-3 py-3">{medida.plicometria.suprailiaco}</td>
-                            <td className="text-center px-3 py-3">{medida.plicometria.muslo}</td>
-                            <td className="text-center px-3 py-3">{medida.plicometria.gemelo}</td>
-                          </>
-                        )}
-                        {medidaSeccion === 'antropometria' && (
-                          <>
-                            <td className="text-center px-3 py-3">{medida.antropometria.hombro}</td>
-                            <td className="text-center px-3 py-3">{medida.antropometria.biceps}</td>
-                            <td className="text-center px-3 py-3">{medida.antropometria.pecho}</td>
-                            <td className="text-center px-3 py-3">{medida.antropometria.cintura}</td>
-                            <td className="text-center px-3 py-3">{medida.antropometria.cadera}</td>
-                            <td className="text-center px-3 py-3">{medida.antropometria.gluteos}</td>
-                            <td className="text-center px-3 py-3">{medida.antropometria.cuadriceps}</td>
-                            <td className="text-center px-3 py-3">{medida.antropometria.gemelo}</td>
-                          </>
-                        )}
-                      </tr>
-                    ))}
+                    {medidas && medidas.map((medida) => {
+                      const bio = medida.bioimpedancia as any;
+                      const seg = medida.segmental as any;
+                      const plic = medida.plicometria as any;
+                      const antro = medida.antropometria as any;
+                      
+                      return (
+                        <tr key={medida.id} className="table-row-hover">
+                          <td className="px-4 py-3 font-medium">{formatDate(medida.fecha)}</td>
+                          {medidaSeccion === 'bioimpedancia' && (
+                            <>
+                              <td className="text-center px-3 py-3">{bio?.peso || 0} kg</td>
+                              <td className="text-center px-3 py-3">{bio?.grasaSubcutanea || 0}%</td>
+                              <td className="text-center px-3 py-3">{bio?.agua || 0}%</td>
+                              <td className="text-center px-3 py-3">{bio?.musculo || 0} kg</td>
+                              <td className="text-center px-3 py-3">{bio?.metabolismoBasal || 0}</td>
+                              <td className="text-center px-3 py-3">{bio?.edadMetabolica || 0}</td>
+                              <td className="text-center px-3 py-3">{bio?.grasaVisceral || 0}</td>
+                              <td className="text-center px-3 py-3">{bio?.azucarSangre || 0}</td>
+                              <td className="text-center px-3 py-3">{bio?.tension || '-'}</td>
+                              <td className="text-center px-3 py-3 font-semibold">{bio?.imc || 0}</td>
+                            </>
+                          )}
+                          {medidaSeccion === 'segmental' && (
+                            <>
+                              <td className="text-center px-3 py-3">{seg?.brazoIzq?.kg || 0}kg / {seg?.brazoIzq?.porcentaje || 0}%</td>
+                              <td className="text-center px-3 py-3">{seg?.brazoDer?.kg || 0}kg / {seg?.brazoDer?.porcentaje || 0}%</td>
+                              <td className="text-center px-3 py-3">{seg?.tronco?.kg || 0}kg / {seg?.tronco?.porcentaje || 0}%</td>
+                              <td className="text-center px-3 py-3">{seg?.piernaIzq?.kg || 0}kg / {seg?.piernaIzq?.porcentaje || 0}%</td>
+                              <td className="text-center px-3 py-3">{seg?.piernaDer?.kg || 0}kg / {seg?.piernaDer?.porcentaje || 0}%</td>
+                            </>
+                          )}
+                          {medidaSeccion === 'plicometria' && (
+                            <>
+                              <td className="text-center px-3 py-3">{plic?.bicipital || 0}</td>
+                              <td className="text-center px-3 py-3">{plic?.tricipital || 0}</td>
+                              <td className="text-center px-3 py-3">{plic?.subEscapular || 0}</td>
+                              <td className="text-center px-3 py-3">{plic?.abdominal || 0}</td>
+                              <td className="text-center px-3 py-3">{plic?.suprailiaco || 0}</td>
+                              <td className="text-center px-3 py-3">{plic?.muslo || 0}</td>
+                              <td className="text-center px-3 py-3">{plic?.gemelo || 0}</td>
+                            </>
+                          )}
+                          {medidaSeccion === 'antropometria' && (
+                            <>
+                              <td className="text-center px-3 py-3">{antro?.hombro || 0}</td>
+                              <td className="text-center px-3 py-3">{antro?.biceps || 0}</td>
+                              <td className="text-center px-3 py-3">{antro?.pecho || 0}</td>
+                              <td className="text-center px-3 py-3">{antro?.cintura || 0}</td>
+                              <td className="text-center px-3 py-3">{antro?.cadera || 0}</td>
+                              <td className="text-center px-3 py-3">{antro?.gluteos || 0}</td>
+                              <td className="text-center px-3 py-3">{antro?.cuadriceps || 0}</td>
+                              <td className="text-center px-3 py-3">{antro?.gemelo || 0}</td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -460,8 +478,9 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
 
             {/* Grid de biomarcadores */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">
-              {biomarcadores.map((bio) => {
-                const info = BIOMARCADORES_INFO[bio.tipo];
+              {(biomarcadores || []).map((bio) => {
+                const info = BIOMARCADORES_INFO[bio.tipo as keyof typeof BIOMARCADORES_INFO];
+                if (!info) return null;
                 return (
                   <Card key={bio.id} className="relative overflow-hidden">
                     <div 
@@ -497,11 +516,13 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
                       </div>
                     </div>
 
-                    {bio.tareas.length > 0 && (
+                    {bio.tareas && Array.isArray(bio.tareas) && bio.tareas.length > 0 && (
                       <div className="pt-3 border-t border-border">
-                        <p className="text-xs font-medium text-muted mb-2">Tareas ({bio.tareas.filter(t => t.completada).length}/{bio.tareas.length})</p>
+                        <p className="text-xs font-medium text-muted mb-2">
+                          Tareas ({(bio.tareas as any[]).filter((t: any) => t.completada).length}/{bio.tareas.length})
+                        </p>
                         <ul className="space-y-1.5">
-                          {bio.tareas.slice(0, 3).map((tarea) => (
+                          {(bio.tareas as any[]).slice(0, 3).map((tarea: any) => (
                             <li key={tarea.id} className="flex items-start gap-2 text-xs">
                               <span className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
                                 tarea.completada ? 'bg-primary text-white' : 'bg-muted-light text-muted'
@@ -521,7 +542,7 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
               })}
             </div>
 
-            {biomarcadores.length === 0 && (
+            {(!biomarcadores || biomarcadores.length === 0) && (
               <Card>
                 <div className="text-center py-12 text-muted">
                   <Heart className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -564,7 +585,7 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
             <Card>
               <h3 className="font-medium text-foreground mb-4">Herramientas Disponibles</h3>
               <div className="space-y-3">
-                {herramientasMock.slice(0, 3).map((herramienta) => (
+                {herramientas && herramientas.slice(0, 3).map((herramienta) => (
                   <div 
                     key={herramienta.id}
                     className="flex items-center justify-between p-4 rounded-xl bg-background hover:bg-primary-light/20 transition-colors"
@@ -583,6 +604,9 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
                     </Button>
                   </div>
                 ))}
+                {(!herramientas || herramientas.length === 0) && (
+                  <p className="text-center text-muted py-4">No hay herramientas disponibles</p>
+                )}
               </div>
               <Link 
                 href="/herramientas"
