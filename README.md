@@ -1,36 +1,171 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🥗 NutriDash - Dashboard de Nutrición
 
-## Getting Started
+Dashboard profesional para nutricionistas con gestión completa de pacientes, biomarcadores, medidas corporales y dietas personalizadas.
 
-First, run the development server:
+## ✨ Características
 
+- 📊 **Dashboard Principal** - Estadísticas y resumen general
+- 👥 **Gestión de Pacientes** - Listado, búsqueda, formulario de evaluación inicial completo
+- 📏 **Medidas Corporales** - 4 tipos de mediciones:
+  - Bioimpedancia+ (peso, grasa, agua, músculo, metabolismo, etc.)
+  - Bioimpedancia Segmental (brazos, tronco, piernas)
+  - Plicometría (7 pliegues en mm)
+  - Antropometría (12 perímetros en cm)
+- 🧬 **10 Biomarcadores** - Con porcentajes, gráfico radar y tareas:
+  1. Funciones Gastrointestinales
+  2. Biorritmo
+  3. Osteoarticular
+  4. Datos Clínicos
+  5. Estética
+  6. Psiconutrición
+  7. Rendimiento Deportivo
+  8. Hormonas
+  9. Sistema Inmune
+  10. Microbiota
+- 📚 **Herramientas de Aprendizaje** - CRUD completo de material educativo
+- 🍽️ **Dietas con IA** - Integración con Spoonacular API
+- 📄 **Documentos Clínicos** - Gestión de análisis e informes
+- 🗄️ **Base de Datos Supabase** - PostgreSQL en la nube
+
+## 🚀 Inicio Rápido
+
+### Prerrequisitos
+
+- Node.js 18+ 
+- npm o yarn
+- Cuenta de Supabase (gratis)
+- (Opcional) API key de Spoonacular para dietas
+
+### Instalación
+
+1. **Clonar el repositorio**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/AmparoGarcia84/nutrition-dashboard.git
+cd nutrition-dashboard
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. **Instalar dependencias**
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. **Configurar variables de entorno**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Crea un archivo `.env.local` en la raíz:
 
-## Learn More
+```env
+# Supabase (obligatorio)
+NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key_aqui
 
-To learn more about Next.js, take a look at the following resources:
+# Spoonacular (opcional - para dietas)
+NEXT_PUBLIC_SPOONACULAR_API_KEY=tu_api_key_aqui
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. **Configurar Supabase**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Ve a [supabase.com](https://supabase.com) y crea un proyecto gratis
+- En el SQL Editor, ejecuta el contenido de `supabase/schema.sql`
+- Copia la URL y anon key a `.env.local`
 
-## Deploy on Vercel
+5. **Iniciar servidor de desarrollo**
+```bash
+npm run dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📁 Estructura del Proyecto
+
+```
+nutrition-dashboard/
+├── app/                    # Páginas Next.js
+│   ├── page.tsx           # Dashboard principal
+│   ├── pacientes/         # Gestión de pacientes
+│   ├── herramientas/      # Material educativo
+│   └── layout.tsx         # Layout principal
+├── components/            # Componentes React
+│   ├── layout/           # Sidebar, Header
+│   ├── ui/               # Componentes base (Button, Card, etc.)
+│   └── dietas/           # Generador de dietas
+├── lib/                  # Utilidades
+│   ├── hooks/            # Hooks personalizados (usePacientes, etc.)
+│   ├── supabase.ts       # Cliente Supabase
+│   ├── spoonacular.ts    # API Spoonacular
+│   └── utils.ts          # Funciones auxiliares
+├── types/                # Tipos TypeScript
+│   ├── index.ts          # Tipos de la app
+│   └── database.ts       # Tipos de Supabase
+└── supabase/             # SQL y migraciones
+    └── schema.sql        # Esquema de base de datos
+```
+
+## 🎨 Colores Corporativos
+
+- **Verde Principal:** `#69956D`
+- **Verde Claro:** `#A1B4A3`
+- **Naranja/Dorado:** `#D98D1C`
+- **Fondo:** `#E3EEE4`
+- **Gris Púrpura:** `#8F8BA5`
+- **Gris Oscuro:** `#656176`
+
+## 🗄️ Base de Datos
+
+### Tablas
+
+- `pacientes` - Datos de evaluación inicial
+- `medidas` - Todas las mediciones corporales
+- `biomarcadores` - Los 10 biomarcadores con tareas
+- `documentos` - Análisis clínicos
+- `herramientas` - Material educativo
+- `herramientas_asignadas` - Relación paciente-herramienta
+- `dietas` - Planes de dieta generados
+
+### Plan Gratuito de Supabase
+
+- ✅ 500MB de almacenamiento
+- ✅ 50,000 filas
+- ✅ Suficiente para ~100 pacientes con todas sus mediciones
+
+## 🍽️ Spoonacular API
+
+Para generar dietas personalizadas:
+
+1. Ve a [spoonacular.com/food-api](https://spoonacular.com/food-api/console#Dashboard)
+2. Crea una cuenta gratis (sin tarjeta)
+3. Copia tu API Key
+4. Añádela a `.env.local`
+
+**Plan gratuito:** 150 puntos/día (~150 consultas)
+
+## 📝 Scripts Disponibles
+
+```bash
+npm run dev      # Servidor de desarrollo
+npm run build    # Build de producción
+npm run start    # Servidor de producción
+npm run lint     # Linter
+```
+
+## 🛠️ Tecnologías
+
+- **Next.js 16** - Framework React
+- **React 19** - UI Library
+- **TypeScript** - Type Safety
+- **Tailwind CSS 4** - Estilos
+- **Supabase** - Base de datos PostgreSQL
+- **Spoonacular** - API de recetas y dietas
+- **Recharts** - Gráficos
+- **Lucide React** - Iconos
+
+## 📄 Licencia
+
+Este proyecto es una prueba de concepto.
+
+## 🤝 Contribuciones
+
+Este es un proyecto privado, pero siéntete libre de hacer fork y adaptarlo a tus necesidades.
+
+---
+
+**Desarrollado con ❤️ para nutricionistas profesionales**
