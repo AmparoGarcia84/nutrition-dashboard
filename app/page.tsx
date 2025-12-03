@@ -2,7 +2,6 @@
 
 import { Card } from '@/components/ui';
 import { usePacientes } from '@/lib/hooks';
-import { useMedidas } from '@/lib/hooks';
 import { 
   Users, 
   UserPlus, 
@@ -15,41 +14,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-const stats = [
-  { 
-    name: 'Total Pacientes', 
-    value: pacientesMock.length, 
-    change: '+2 este mes',
-    trend: 'up',
-    icon: Users,
-    color: 'primary'
-  },
-  { 
-    name: 'Pacientes Activos', 
-    value: pacientesMock.filter(p => p.activo).length, 
-    change: '100%',
-    trend: 'up',
-    icon: Activity,
-    color: 'success'
-  },
-  { 
-    name: 'Citas esta semana', 
-    value: 12, 
-    change: '+3 vs anterior',
-    trend: 'up',
-    icon: Calendar,
-    color: 'secondary'
-  },
-  { 
-    name: 'Objetivos cumplidos', 
-    value: '85%', 
-    change: '+5%',
-    trend: 'up',
-    icon: Target,
-    color: 'accent'
-  },
-];
-
 const colorClasses: Record<string, { bg: string; text: string; icon: string }> = {
   primary: { bg: 'bg-primary-light/50', text: 'text-primary-dark', icon: 'text-primary' },
   success: { bg: 'bg-success-light', text: 'text-success', icon: 'text-success' },
@@ -59,6 +23,14 @@ const colorClasses: Record<string, { bg: string; text: string; icon: string }> =
 
 export default function Dashboard() {
   const { pacientes, loading: loadingPacientes } = usePacientes();
+  
+  if (loadingPacientes) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
   
   // Calcular estadísticas reales
   const statsCalculadas = [
