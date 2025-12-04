@@ -117,7 +117,12 @@ export async function generateMealPlanDay(
 export async function generateMealPlanWeek(
   targetCalories: number = 2000,
   diet?: string,
-  exclude?: string
+  exclude?: string,
+  macros?: {
+    protein?: number; // % de proteínas
+    carbs?: number;   // % de hidratos
+    fat?: number;     // % de grasas
+  }
 ): Promise<{ week: Record<string, MealPlanDay> } | null> {
   if (!isApiConfigured()) {
     console.warn('Spoonacular API key no configurada');
@@ -142,7 +147,16 @@ export async function generateMealPlanWeek(
       throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    
+    // Si hay filtros de macronutrientes, ajustar los resultados
+    // Nota: Spoonacular no permite filtrar directamente por %, así que ajustamos después
+    if (macros && (macros.protein || macros.carbs || macros.fat)) {
+      // Por ahora retornamos los datos tal cual, el ajuste se hará en el frontend
+      // o podemos hacer múltiples llamadas y filtrar
+    }
+
+    return data;
   } catch (error) {
     console.error('Error generando plan semanal:', error);
     return null;

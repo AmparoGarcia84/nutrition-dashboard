@@ -3,7 +3,7 @@
 import { use, useState } from 'react';
 import Link from 'next/link';
 import { Card, Button, Badge } from '@/components/ui';
-import { usePaciente, useMedidas, useBiomarcadores, useHerramientas } from '@/lib/hooks';
+import { usePaciente, useMedidas, useBiomarcadores, useHerramientas, useHerramientasAsignadas } from '@/lib/hooks';
 import { BIOMARCADORES_INFO } from '@/types';
 import { formatDate, calcularEdad } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
@@ -27,6 +27,9 @@ import {
   Ruler
 } from 'lucide-react';
 import GeneradorDietas from '@/components/dietas/GeneradorDietas';
+import FormMedida from '@/components/medidas/FormMedida';
+import FormBiomarcador from '@/components/biomarcadores/FormBiomarcador';
+import AsignarHerramientas from '@/components/herramientas/AsignarHerramientas';
 import { 
   LineChart, 
   Line, 
@@ -56,11 +59,16 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
   const resolvedParams = use(params);
   const [activeTab, setActiveTab] = useState('medidas');
   const [medidaSeccion, setMedidaSeccion] = useState<'bioimpedancia' | 'segmental' | 'plicometria' | 'antropometria'>('bioimpedancia');
+  const [showFormMedida, setShowFormMedida] = useState(false);
+  const [showFormBiomarcador, setShowFormBiomarcador] = useState(false);
+  const [editingBiomarcadorId, setEditingBiomarcadorId] = useState<string | null>(null);
+  const [showAsignarHerramientas, setShowAsignarHerramientas] = useState(false);
   
   const { paciente, loading: loadingPaciente } = usePaciente(resolvedParams.id);
-  const { medidas, loading: loadingMedidas } = useMedidas(resolvedParams.id);
-  const { biomarcadores, loading: loadingBiomarcadores } = useBiomarcadores(resolvedParams.id);
+  const { medidas, loading: loadingMedidas, refresh: refreshMedidas } = useMedidas(resolvedParams.id);
+  const { biomarcadores, loading: loadingBiomarcadores, refresh: refreshBiomarcadores } = useBiomarcadores(resolvedParams.id);
   const { herramientas } = useHerramientas();
+  const { asignadas: herramientasAsignadas } = useHerramientasAsignadas(resolvedParams.id);
 
   if (loadingPaciente) {
     return (
@@ -252,7 +260,11 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
             <Card>
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-foreground">Evolución del Peso</h2>
-                <Button variant="outline" className="gap-2">
+                <Button 
+                  variant="outline" 
+                  className="gap-2"
+                  onClick={() => setShowFormMedida(true)}
+                >
                   <Plus className="w-4 h-4" />
                   Nueva Medida
                 </Button>
@@ -439,9 +451,16 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-foreground">Los 10 Biomarcadores</h2>
-              <Button variant="outline" className="gap-2">
+              <Button 
+                variant="outline" 
+                className="gap-2"
+                onClick={() => {
+                  setEditingBiomarcadorId(null);
+                  setShowFormBiomarcador(true);
+                }}
+              >
                 <Plus className="w-4 h-4" />
-                Actualizar Biomarcadores
+                {biomarcadores && biomarcadores.length < 10 ? 'Añadir Biomarcador' : 'Editar Biomarcadores'}
               </Button>
             </div>
 
@@ -482,7 +501,14 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
                 const info = BIOMARCADORES_INFO[bio.tipo as keyof typeof BIOMARCADORES_INFO];
                 if (!info) return null;
                 return (
-                  <Card key={bio.id} className="relative overflow-hidden">
+                  <Card 
+                    key={bio.id} 
+                    className="relative overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                    onClick={() => {
+                      setEditingBiomarcadorId(bio.id);
+                      setShowFormBiomarcador(true);
+                    }}
+                  >
                     <div 
                       className="absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl opacity-20"
                       style={{ backgroundColor: info.color }}
@@ -576,49 +602,96 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-foreground">Herramientas Asignadas</h2>
-              <Button variant="outline" className="gap-2">
+              <Button 
+                variant="outline" 
+                className="gap-2"
+                onClick={() => setShowAsignarHerramientas(true)}
+              >
                 <Plus className="w-4 h-4" />
                 Asignar Herramienta
               </Button>
             </div>
 
-            <Card>
-              <h3 className="font-medium text-foreground mb-4">Herramientas Disponibles</h3>
-              <div className="space-y-3">
-                {herramientas && herramientas.slice(0, 3).map((herramienta) => (
-                  <div 
-                    key={herramienta.id}
-                    className="flex items-center justify-between p-4 rounded-xl bg-background hover:bg-primary-light/20 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary-light/50 flex items-center justify-center">
-                        <BookOpen className="w-5 h-5 text-primary" />
+            {herramientasAsignadas && herramientasAsignadas.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {herramientasAsignadas.map((asignada) => {
+                  const herramienta = (asignada as any).herramienta;
+                  if (!herramienta) return null;
+                  
+                  return (
+                    <Card key={asignada.id} className="hover:shadow-lg transition-shadow">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-primary-light/50 flex items-center justify-center flex-shrink-0">
+                          <BookOpen className="w-6 h-6 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground mb-1">{herramienta.titulo}</h3>
+                          <p className="text-sm text-muted mb-2 line-clamp-2">{herramienta.descripcion}</p>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="primary" size="sm">
+                              {herramienta.tipo.toUpperCase()}
+                            </Badge>
+                            <span className="text-xs text-muted bg-muted-light px-2 py-1 rounded">
+                              {herramienta.categoria}
+                            </span>
+                          </div>
+                          <a
+                            href={herramienta.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-3 inline-flex items-center gap-2 text-sm text-primary hover:text-primary-dark font-medium"
+                          >
+                            Abrir herramienta
+                            <ChevronRight className="w-4 h-4" />
+                          </a>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-foreground">{herramienta.titulo}</p>
-                        <p className="text-sm text-muted">{herramienta.categoria}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm">
-                      Asignar
-                    </Button>
-                  </div>
-                ))}
-                {(!herramientas || herramientas.length === 0) && (
-                  <p className="text-center text-muted py-4">No hay herramientas disponibles</p>
-                )}
+                    </Card>
+                  );
+                })}
               </div>
-              <Link 
-                href="/herramientas"
-                className="mt-4 text-sm text-primary hover:text-primary-dark font-medium inline-flex items-center gap-1"
-              >
-                Ver todas las herramientas
-                <ChevronRight className="w-4 h-4" />
-              </Link>
-            </Card>
+            ) : (
+              <Card>
+                <div className="text-center py-12 text-muted">
+                  <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No hay herramientas asignadas todavía.</p>
+                  <p className="text-sm mt-1">Asigna herramientas desde el botón de arriba.</p>
+                </div>
+              </Card>
+            )}
           </div>
         )}
       </div>
+
+      {/* Modales */}
+      {showFormMedida && (
+        <FormMedida
+          pacienteId={resolvedParams.id}
+          onClose={() => {
+            setShowFormMedida(false);
+            refreshMedidas();
+          }}
+        />
+      )}
+
+      {showFormBiomarcador && (
+        <FormBiomarcador
+          pacienteId={resolvedParams.id}
+          biomarcadorId={editingBiomarcadorId || undefined}
+          onClose={() => {
+            setShowFormBiomarcador(false);
+            setEditingBiomarcadorId(null);
+            refreshBiomarcadores();
+          }}
+        />
+      )}
+
+      {showAsignarHerramientas && (
+        <AsignarHerramientas
+          pacienteId={resolvedParams.id}
+          onClose={() => setShowAsignarHerramientas(false)}
+        />
+      )}
     </div>
   );
 }

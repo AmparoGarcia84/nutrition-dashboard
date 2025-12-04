@@ -18,6 +18,7 @@ import {
   X,
   Upload
 } from 'lucide-react';
+import FileUpload from '@/components/herramientas/FileUpload';
 
 const tipoIconos: Record<string, React.ElementType> = {
   pdf: FileText,
@@ -298,12 +299,10 @@ export default function HerramientasPage() {
                 placeholder="https://... o /docs/archivo.pdf"
               />
 
-              <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-primary transition-colors cursor-pointer">
-                <Upload className="w-8 h-8 text-muted mx-auto mb-2" />
-                <p className="text-sm text-muted">
-                  Arrastra un archivo aquí o haz clic para seleccionar
-                </p>
-              </div>
+              <FileUpload
+                onFileSelect={(url) => setFormData(prev => ({ ...prev, url }))}
+                currentUrl={formData.url}
+              />
             </div>
 
             <div className="flex justify-end gap-3 mt-6">

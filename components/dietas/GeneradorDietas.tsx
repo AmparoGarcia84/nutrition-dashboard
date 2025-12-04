@@ -11,6 +11,13 @@ import {
   type MealPlanDay,
   type Recipe
 } from '@/lib/spoonacular';
+import {
+  traducirTitulo,
+  traducirIngrediente,
+  traducirDieta,
+  traducirTipoPlato,
+  traducirNutriente,
+} from '@/lib/translations';
 import { 
   Utensils, 
   Flame, 
@@ -22,7 +29,9 @@ import {
   ExternalLink,
   Loader2,
   Calendar,
-  CalendarDays
+  CalendarDays,
+  Percent,
+  TrendingUp
 } from 'lucide-react';
 
 interface GeneradorDietasProps {
@@ -30,36 +39,98 @@ interface GeneradorDietasProps {
   pacienteNombre: string;
 }
 
+type PlanType = 'day' | 'week';
+
+interface MealPlanWeek {
+  week: Record<string, MealPlanDay>;
+}
+
 export default function GeneradorDietas({ pacienteId, pacienteNombre }: GeneradorDietasProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mealPlan, setMealPlan] = useState<MealPlanDay | null>(null);
+  const [mealPlanWeek, setMealPlanWeek] = useState<MealPlanWeek | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [loadingRecipe, setLoadingRecipe] = useState(false);
+  const [planType, setPlanType] = useState<PlanType>('week');
   
   // Opciones del generador
   const [calorias, setCalorias] = useState(2000);
   const [dieta, setDieta] = useState('');
   const [excluir, setExcluir] = useState('');
+  
+  // Filtros de macronutrientes
+  const [proteinPercent, setProteinPercent] = useState<number>(30);
+  const [carbsPercent, setCarbsPercent] = useState<number>(40);
+  const [fatPercent, setFatPercent] = useState<number>(30);
+  const [showMacros, setShowMacros] = useState(false);
 
   const apiConfigured = isApiConfigured();
 
-  const handleGenerarDiario = async () => {
+  // Validar que los macronutrientes sumen 100%
+  const macrosSum = proteinPercent + carbsPercent + fatPercent;
+  const macrosValid = Math.abs(macrosSum - 100) < 1; // Permitir pequeña diferencia por redondeo
+
+  const handleGenerarPlan = async () => {
     setIsLoading(true);
     setError(null);
     setSelectedRecipe(null);
+    setMealPlan(null);
+    setMealPlanWeek(null);
 
     try {
-      const plan = await generateMealPlanDay(
-        calorias,
-        dieta || undefined,
-        excluir || undefined
-      );
+      if (planType === 'day') {
+        const plan = await generateMealPlanDay(
+          calorias,
+          dieta || undefined,
+          excluir || undefined
+        );
 
-      if (plan) {
-        setMealPlan(plan);
+        if (plan) {
+          // Aplicar traducciones
+          const planTraducido = {
+            ...plan,
+            meals: plan.meals.map(meal => ({
+              ...meal,
+              title: traducirTitulo(meal.title)
+            }))
+          };
+          setMealPlan(planTraducido);
+        } else {
+          setError('No se pudo generar el plan. Verifica la API key.');
+        }
       } else {
-        setError('No se pudo generar el plan. Verifica la API key.');
+        const plan = await generateMealPlanWeek(
+          calorias,
+          dieta || undefined,
+          excluir || undefined,
+          showMacros ? {
+            protein: proteinPercent,
+            carbs: carbsPercent,
+            fat: fatPercent
+          } : undefined
+        );
+
+        if (plan) {
+          // Aplicar traducciones a todos los días
+          const weekTraducido: MealPlanWeek = {
+            week: Object.fromEntries(
+              Object.entries(plan.week).map(([day, dayPlan]) => [
+                day,
+                {
+                  ...dayPlan,
+                  meals: dayPlan.meals.map(meal => ({
+                    ...meal,
+                    title: traducirTitulo(meal.title)
+                  }))
+                }
+              ])
+            )
+          };
+          setMealPlanWeek(weekTraducido);
+        } else {
+          setError('No se pudo generar el plan. Verifica la API key.');
+        }
       }
     } catch (err) {
       setError('Error al conectar con Spoonacular');
@@ -72,12 +143,76 @@ export default function GeneradorDietas({ pacienteId, pacienteNombre }: Generado
     setLoadingRecipe(true);
     try {
       const recipe = await getRecipeInfo(recipeId);
-      setSelectedRecipe(recipe);
+      if (recipe) {
+        // Aplicar traducciones
+        const recipeTraducido: Recipe = {
+          ...recipe,
+          title: traducirTitulo(recipe.title),
+          diets: recipe.diets?.map(d => traducirDieta(d)),
+          dishTypes: recipe.dishTypes?.map(d => traducirTipoPlato(d)),
+          extendedIngredients: recipe.extendedIngredients?.map(ing => ({
+            ...ing,
+            original: traducirIngrediente(ing.original),
+            name: traducirIngrediente(ing.name)
+          })),
+          nutrition: recipe.nutrition ? {
+            ...recipe.nutrition,
+            nutrients: recipe.nutrition.nutrients.map(nut => ({
+              ...nut,
+              name: traducirNutriente(nut.name)
+            }))
+          } : undefined
+        };
+        setSelectedRecipe(recipeTraducido);
+      }
     } catch (err) {
       console.error('Error cargando receta:', err);
     } finally {
       setLoadingRecipe(false);
     }
+  };
+
+  // Ajustar macronutrientes automáticamente
+  const ajustarMacros = (tipo: 'protein' | 'carbs' | 'fat', nuevoValor: number) => {
+    const diferencia = nuevoValor - (tipo === 'protein' ? proteinPercent : tipo === 'carbs' ? carbsPercent : fatPercent);
+    const otrosMacros = tipo === 'protein' 
+      ? { carbs: carbsPercent, fat: fatPercent }
+      : tipo === 'carbs'
+      ? { protein: proteinPercent, fat: fatPercent }
+      : { protein: proteinPercent, carbs: carbsPercent };
+    
+    const sumaOtros = otrosMacros.protein + otrosMacros.carbs + otrosMacros.fat;
+    const total = nuevoValor + sumaOtros;
+    
+    if (total > 100) {
+      // Reducir proporcionalmente los otros
+      const factor = (100 - nuevoValor) / sumaOtros;
+      if (tipo === 'protein') {
+        setCarbsPercent(Math.round(otrosMacros.carbs * factor));
+        setFatPercent(Math.round(otrosMacros.fat * factor));
+      } else if (tipo === 'carbs') {
+        setProteinPercent(Math.round(otrosMacros.protein * factor));
+        setFatPercent(Math.round(otrosMacros.fat * factor));
+      } else {
+        setProteinPercent(Math.round(otrosMacros.protein * factor));
+        setCarbsPercent(Math.round(otrosMacros.carbs * factor));
+      }
+    }
+    
+    if (tipo === 'protein') setProteinPercent(nuevoValor);
+    else if (tipo === 'carbs') setCarbsPercent(nuevoValor);
+    else setFatPercent(nuevoValor);
+  };
+
+  // Nombres de días en español
+  const diasSemana: Record<string, string> = {
+    monday: 'Lunes',
+    tuesday: 'Martes',
+    wednesday: 'Miércoles',
+    thursday: 'Jueves',
+    friday: 'Viernes',
+    saturday: 'Sábado',
+    sunday: 'Domingo'
   };
 
   // Si la API no está configurada, mostrar instrucciones
@@ -151,6 +286,37 @@ export default function GeneradorDietas({ pacienteId, pacienteNombre }: Generado
           </div>
         </div>
 
+        {/* Selector de tipo de plan */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-foreground mb-2">
+            Tipo de Plan
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPlanType('week')}
+              className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all ${
+                planType === 'week'
+                  ? 'bg-primary text-white shadow-lg shadow-primary/30'
+                  : 'bg-white text-muted hover:text-foreground border border-border'
+              }`}
+            >
+              <CalendarDays className="w-4 h-4 inline mr-2" />
+              Plan Semanal
+            </button>
+            <button
+              onClick={() => setPlanType('day')}
+              className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all ${
+                planType === 'day'
+                  ? 'bg-primary text-white shadow-lg shadow-primary/30'
+                  : 'bg-white text-muted hover:text-foreground border border-border'
+              }`}
+            >
+              <Calendar className="w-4 h-4 inline mr-2" />
+              Plan Diario
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -201,18 +367,87 @@ export default function GeneradorDietas({ pacienteId, pacienteNombre }: Generado
           </div>
         </div>
 
+        {/* Filtros de macronutrientes */}
+        <div className="mb-6">
+          <button
+            onClick={() => setShowMacros(!showMacros)}
+            className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
+          >
+            <Percent className="w-4 h-4" />
+            {showMacros ? 'Ocultar' : 'Mostrar'} filtros de macronutrientes
+            <TrendingUp className="w-4 h-4" />
+          </button>
+
+          {showMacros && (
+            <div className="mt-4 p-4 bg-background rounded-xl border border-border">
+              <p className="text-sm text-muted mb-4">
+                Distribución de macronutrientes (debe sumar 100%)
+              </p>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-2">
+                    Proteínas: {proteinPercent}%
+                  </label>
+                  <input
+                    type="range"
+                    min="10"
+                    max="50"
+                    value={proteinPercent}
+                    onChange={(e) => ajustarMacros('protein', Number(e.target.value))}
+                    className="w-full h-2 bg-muted-light rounded-full appearance-none cursor-pointer accent-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-2">
+                    Hidratos: {carbsPercent}%
+                  </label>
+                  <input
+                    type="range"
+                    min="20"
+                    max="60"
+                    value={carbsPercent}
+                    onChange={(e) => ajustarMacros('carbs', Number(e.target.value))}
+                    className="w-full h-2 bg-muted-light rounded-full appearance-none cursor-pointer accent-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-2">
+                    Grasas: {fatPercent}%
+                  </label>
+                  <input
+                    type="range"
+                    min="15"
+                    max="50"
+                    value={fatPercent}
+                    onChange={(e) => ajustarMacros('fat', Number(e.target.value))}
+                    className="w-full h-2 bg-muted-light rounded-full appearance-none cursor-pointer accent-primary"
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between text-xs">
+                <span className={`${macrosValid ? 'text-success' : 'text-danger'}`}>
+                  Total: {macrosSum}%
+                </span>
+                {!macrosValid && (
+                  <span className="text-danger">⚠️ Debe sumar 100%</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="flex gap-3">
           <Button 
-            onClick={handleGenerarDiario}
-            disabled={isLoading}
+            onClick={handleGenerarPlan}
+            disabled={isLoading || (showMacros && !macrosValid)}
             className="gap-2"
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <Calendar className="w-4 h-4" />
+              planType === 'week' ? <CalendarDays className="w-4 h-4" /> : <Calendar className="w-4 h-4" />
             )}
-            Generar Plan Diario
+            Generar Plan {planType === 'week' ? 'Semanal' : 'Diario'}
           </Button>
         </div>
 
@@ -223,12 +458,12 @@ export default function GeneradorDietas({ pacienteId, pacienteNombre }: Generado
         )}
       </Card>
 
-      {/* Resultados del plan */}
+      {/* Resultados del plan diario */}
       {mealPlan && (
         <Card>
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-semibold text-foreground">
-              Plan para {pacienteNombre}
+              Plan Diario para {pacienteNombre}
             </h3>
             <div className="flex items-center gap-4 text-sm">
               <span className="flex items-center gap-1 text-accent">
@@ -236,13 +471,13 @@ export default function GeneradorDietas({ pacienteId, pacienteNombre }: Generado
                 {Math.round(mealPlan.nutrients.calories)} kcal
               </span>
               <span className="text-muted">
-                P: {Math.round(mealPlan.nutrients.protein)}g
+                P: {Math.round(mealPlan.nutrients.protein)}g ({Math.round((mealPlan.nutrients.protein * 4 / mealPlan.nutrients.calories) * 100)}%)
               </span>
               <span className="text-muted">
-                C: {Math.round(mealPlan.nutrients.carbohydrates)}g
+                C: {Math.round(mealPlan.nutrients.carbohydrates)}g ({Math.round((mealPlan.nutrients.carbohydrates * 4 / mealPlan.nutrients.calories) * 100)}%)
               </span>
               <span className="text-muted">
-                G: {Math.round(mealPlan.nutrients.fat)}g
+                G: {Math.round(mealPlan.nutrients.fat)}g ({Math.round((mealPlan.nutrients.fat * 9 / mealPlan.nutrients.calories) * 100)}%)
               </span>
             </div>
           </div>
@@ -312,6 +547,99 @@ export default function GeneradorDietas({ pacienteId, pacienteNombre }: Generado
         </Card>
       )}
 
+      {/* Resultados del plan semanal */}
+      {mealPlanWeek && (
+        <div className="space-y-6">
+          {Object.entries(mealPlanWeek.week).map(([day, dayPlan]) => (
+            <Card key={day}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-foreground">
+                  {diasSemana[day] || day}
+                </h3>
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="flex items-center gap-1 text-accent">
+                    <Flame className="w-4 h-4" />
+                    {Math.round(dayPlan.nutrients.calories)} kcal
+                  </span>
+                  <span className="text-muted">
+                    P: {Math.round(dayPlan.nutrients.protein)}g
+                  </span>
+                  <span className="text-muted">
+                    C: {Math.round(dayPlan.nutrients.carbohydrates)}g
+                  </span>
+                  <span className="text-muted">
+                    G: {Math.round(dayPlan.nutrients.fat)}g
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {dayPlan.meals.map((meal, index) => (
+                  <div
+                    key={meal.id}
+                    className="border border-border rounded-xl overflow-hidden hover:shadow-lg transition-shadow"
+                  >
+                    <div className="relative h-40">
+                      <img
+                        src={`https://spoonacular.com/recipeImages/${meal.id}-312x231.jpg`}
+                        alt={meal.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder-food.jpg';
+                        }}
+                      />
+                      <div className="absolute top-2 left-2">
+                        <span className="px-2 py-1 bg-white/90 rounded-full text-xs font-medium">
+                          {index === 0 ? '🌅 Desayuno' : index === 1 ? '☀️ Almuerzo' : '🌙 Cena'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <h4 className="font-medium text-foreground line-clamp-2 mb-2">
+                        {meal.title}
+                      </h4>
+                      <div className="flex items-center gap-4 text-xs text-muted mb-3">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {meal.readyInMinutes} min
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          {meal.servings} pers.
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleVerReceta(meal.id)}
+                          disabled={loadingRecipe}
+                          className="flex-1"
+                        >
+                          {loadingRecipe ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            'Ver receta'
+                          )}
+                        </Button>
+                        <a
+                          href={meal.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 rounded-lg border border-border hover:bg-muted-light transition-colors"
+                        >
+                          <ExternalLink className="w-4 h-4 text-muted" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
       {/* Detalle de receta */}
       {selectedRecipe && (
         <Card>
@@ -347,7 +675,7 @@ export default function GeneradorDietas({ pacienteId, pacienteNombre }: Generado
                 {selectedRecipe.nutrition && (
                   <span className="flex items-center gap-1 text-accent">
                     <Flame className="w-4 h-4" />
-                    {Math.round(selectedRecipe.nutrition.nutrients.find(n => n.name === 'Calories')?.amount || 0)} kcal
+                    {Math.round(selectedRecipe.nutrition.nutrients.find(n => n.name === 'Calorías' || n.name === 'Calories')?.amount || 0)} kcal
                   </span>
                 )}
               </div>
@@ -409,4 +737,3 @@ export default function GeneradorDietas({ pacienteId, pacienteNombre }: Generado
     </div>
   );
 }
-
