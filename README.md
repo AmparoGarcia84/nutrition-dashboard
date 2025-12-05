@@ -1,11 +1,11 @@
-# 🥗 NutriDash - Dashboard de Nutrición
+# 🥗 PSNutrición - Dashboard de Nutrición
 
 Dashboard profesional para nutricionistas con gestión completa de pacientes, biomarcadores, medidas corporales y dietas personalizadas.
 
 ## ✨ Características
 
 - 📊 **Dashboard Principal** - Estadísticas y resumen general
-- 👥 **Gestión de Pacientes** - Listado, búsqueda, formulario de evaluación inicial completo
+- 👥 **Gestión de Pacientes** - Listado, búsqueda, formulario de evaluación inicial completo para registro de nuevos pacientes
 - 📏 **Medidas Corporales** - 4 tipos de mediciones:
   - Bioimpedancia+ (peso, grasa, agua, músculo, metabolismo, etc.)
   - Bioimpedancia Segmental (brazos, tronco, piernas)

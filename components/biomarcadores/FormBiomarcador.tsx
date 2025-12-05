@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Button, Input } from '@/components/ui';
 import { useBiomarcadores } from '@/lib/hooks';
 import { BIOMARCADORES_INFO } from '@/types';
@@ -10,7 +10,9 @@ import {
   Save,
   Plus,
   Trash2,
-  Loader2
+  Loader2,
+  Edit2,
+  Check
 } from 'lucide-react';
 
 interface FormBiomarcadorProps {
@@ -36,7 +38,31 @@ export default function FormBiomarcador({ pacienteId, biomarcadorId, onClose }: 
     tareas: (biomarcadorExistente?.tareas as any[]) || [],
   });
 
+  // Actualizar formData cuando cambie el biomarcadorExistente
+  useEffect(() => {
+    if (biomarcadorExistente) {
+      setFormData({
+        tipo: biomarcadorExistente.tipo,
+        porcentaje: biomarcadorExistente.porcentaje,
+        fecha: biomarcadorExistente.fecha,
+        notas: biomarcadorExistente.notas || '',
+        tareas: (biomarcadorExistente.tareas as any[]) || [],
+      });
+    } else {
+      // Resetear para nuevo biomarcador
+      setFormData({
+        tipo: 'gastrointestinal',
+        porcentaje: 50,
+        fecha: new Date().toISOString().split('T')[0],
+        notas: '',
+        tareas: [],
+      });
+    }
+  }, [biomarcadorExistente]);
+
   const [nuevaTarea, setNuevaTarea] = useState('');
+  const [editingTareaId, setEditingTareaId] = useState<string | null>(null);
+  const [editingTareaText, setEditingTareaText] = useState('');
 
   const handleAddTarea = () => {
     if (nuevaTarea.trim()) {
@@ -62,16 +88,59 @@ export default function FormBiomarcador({ pacienteId, biomarcadorId, onClose }: 
     }));
   };
 
+  const handleEditTarea = (tarea: any) => {
+    setEditingTareaId(tarea.id);
+    setEditingTareaText(tarea.descripcion);
+  };
+
+  const handleSaveTarea = (id: string) => {
+    if (editingTareaText.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        tareas: prev.tareas.map((t: any) => 
+          t.id === id 
+            ? { ...t, descripcion: editingTareaText.trim() }
+            : t
+        )
+      }));
+      setEditingTareaId(null);
+      setEditingTareaText('');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTareaId(null);
+    setEditingTareaText('');
+  };
+
+  const handleToggleTareaCompletada = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tareas: prev.tareas.map((t: any) => 
+        t.id === id 
+          ? { ...t, completada: !t.completada }
+          : t
+      )
+    }));
+  };
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     setError(null);
 
     try {
+      // Asegurar que el porcentaje sea un número válido entre 0 y 100
+      const porcentajeNumero = typeof formData.porcentaje === 'number'
+        ? Math.max(0, Math.min(100, formData.porcentaje))
+        : typeof formData.porcentaje === 'string'
+        ? Math.max(0, Math.min(100, parseFloat(formData.porcentaje) || 0))
+        : 0;
+
       if (biomarcadorId) {
         // Editar
         const success = await updateBiomarcador(biomarcadorId, {
           tipo: formData.tipo,
-          porcentaje: formData.porcentaje,
+          porcentaje: porcentajeNumero,
           fecha: formData.fecha,
           notas: formData.notas || null,
           tareas: formData.tareas,
@@ -88,7 +157,7 @@ export default function FormBiomarcador({ pacienteId, biomarcadorId, onClose }: 
         const nuevo = await createBiomarcador({
           paciente_id: pacienteId,
           tipo: formData.tipo,
-          porcentaje: formData.porcentaje,
+          porcentaje: porcentajeNumero,
           fecha: formData.fecha,
           notas: formData.notas || null,
           tareas: formData.tareas,
@@ -246,13 +315,77 @@ export default function FormBiomarcador({ pacienteId, biomarcadorId, onClose }: 
                   key={tarea.id}
                   className="flex items-center gap-3 p-3 rounded-xl bg-background"
                 >
-                  <span className="flex-1 text-sm text-foreground">{tarea.descripcion}</span>
+                  {/* Checkbox para completada */}
                   <button
-                    onClick={() => handleRemoveTarea(tarea.id)}
-                    className="p-1.5 rounded-lg hover:bg-danger-light transition-colors"
+                    onClick={() => handleToggleTareaCompletada(tarea.id)}
+                    className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                      tarea.completada 
+                        ? 'bg-primary text-white hover:bg-primary-dark' 
+                        : 'bg-muted-light text-muted hover:bg-muted border-2 border-border'
+                    }`}
+                    title={tarea.completada ? 'Marcar como pendiente' : 'Marcar como completada'}
                   >
-                    <Trash2 className="w-4 h-4 text-danger" />
+                    {tarea.completada && <Check className="w-3 h-3" />}
                   </button>
+
+                  {/* Descripción de la tarea - editable */}
+                  {editingTareaId === tarea.id ? (
+                    <div className="flex-1 flex gap-2">
+                      <input
+                        type="text"
+                        value={editingTareaText}
+                        onChange={(e) => setEditingTareaText(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') handleSaveTarea(tarea.id);
+                          if (e.key === 'Escape') handleCancelEdit();
+                        }}
+                        className="flex-1 px-3 py-1.5 rounded-lg border border-primary bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-light"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleSaveTarea(tarea.id)}
+                        className="p-1.5 rounded-lg hover:bg-success-light transition-colors"
+                        title="Guardar"
+                      >
+                        <Check className="w-4 h-4 text-success" />
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="p-1.5 rounded-lg hover:bg-muted-light transition-colors"
+                        title="Cancelar"
+                      >
+                        <X className="w-4 h-4 text-muted" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span 
+                        className={`flex-1 text-sm ${
+                          tarea.completada 
+                            ? 'line-through text-muted' 
+                            : 'text-foreground'
+                        }`}
+                      >
+                        {tarea.descripcion}
+                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handleEditTarea(tarea)}
+                          className="p-1.5 rounded-lg hover:bg-primary-light transition-colors"
+                          title="Editar tarea"
+                        >
+                          <Edit2 className="w-4 h-4 text-primary" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveTarea(tarea.id)}
+                          className="p-1.5 rounded-lg hover:bg-danger-light transition-colors"
+                          title="Eliminar tarea"
+                        >
+                          <Trash2 className="w-4 h-4 text-danger" />
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
               {formData.tareas.length === 0 && (

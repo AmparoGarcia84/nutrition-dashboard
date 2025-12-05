@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Search } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
@@ -33,16 +33,6 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-          <input
-            type="text"
-            placeholder="Buscar paciente..."
-            className="w-64 pl-10 pr-4 py-2 rounded-xl border border-border bg-muted-light/50 text-sm placeholder:text-muted focus:bg-white transition-colors"
-          />
-        </div>
-
         {/* Notifications */}
         <button className="relative p-2 rounded-xl hover:bg-muted-light transition-colors">
           <Bell className="w-5 h-5 text-muted" />

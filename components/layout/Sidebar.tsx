@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { 
   Users, 
   BookOpen, 
   LayoutDashboard,
-  Apple,
   LogOut,
   ChevronLeft,
   ChevronRight
@@ -34,8 +34,14 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="h-20 flex items-center px-6 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <Apple className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center overflow-hidden">
+            <Image 
+              src="/logos/logo-green.png" 
+              alt="NutriDash Logo" 
+              width={40} 
+              height={40}
+              className="object-contain"
+            />
           </div>
           {!collapsed && (
             <div className="animate-fade-in">

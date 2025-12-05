@@ -80,15 +80,16 @@ test.describe('Pacientes Flow', () => {
   test('should search for pacientes', async ({ page }) => {
     await page.goto('/pacientes');
     
-    // Find search input
-    const searchInput = page.locator('input[type="search"], input[placeholder*="buscar" i]').first();
+    // Find search input in the pacientes page (placeholder: "Buscar por nombre, email o localidad...")
+    const searchInput = page.locator('input[placeholder*="Buscar por nombre" i]');
     
-    if (await searchInput.count() > 0) {
-      await searchInput.fill('test');
-      await page.waitForTimeout(500); // Wait for search to filter
-      
-      // Verify results are filtered (this depends on implementation)
-      const results = page.locator('table tbody tr, [class*="card"]');
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('test');
+    await page.waitForTimeout(500); // Wait for search to filter
+    
+    // Verify results are filtered (this depends on implementation)
+    const results = page.locator('table tbody tr, [class*="card"]');
+    if (await results.count() > 0) {
       await expect(results.first()).toBeVisible();
     }
   });

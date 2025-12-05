@@ -20,7 +20,8 @@ import {
 export default function PacientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
-  const { pacientes, loading, error } = usePacientes();
+  const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
+  const { pacientes, loading, error, updatePaciente } = usePacientes();
 
   const filteredPacientes = useMemo(() => {
     if (!pacientes) return [];
@@ -30,6 +31,26 @@ export default function PacientesPage() {
       (p.localidad || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [pacientes, searchTerm]);
+
+  const handleToggleEstado = async (e: React.MouseEvent, pacienteId: string, currentEstado: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setUpdatingIds(prev => new Set(prev).add(pacienteId));
+    
+    const success = await updatePaciente(pacienteId, { activo: !currentEstado });
+    
+    setUpdatingIds(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(pacienteId);
+      return newSet;
+    });
+    
+    if (!success) {
+      // Aquí podrías mostrar un toast de error si lo implementas
+      console.error('Error al actualizar el estado del paciente');
+    }
+  };
 
   if (loading) {
     return (
@@ -175,9 +196,23 @@ export default function PacientesPage() {
                       </p>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant={paciente.activo ? 'success' : 'default'}>
-                        {paciente.activo ? 'Activo' : 'Inactivo'}
-                      </Badge>
+                      <button
+                        onClick={(e) => handleToggleEstado(e, paciente.id, paciente.activo)}
+                        disabled={updatingIds.has(paciente.id)}
+                        className="cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={`Cambiar a ${paciente.activo ? 'Inactivo' : 'Activo'}`}
+                      >
+                        <Badge variant={paciente.activo ? 'success' : 'default'}>
+                          {updatingIds.has(paciente.id) ? (
+                            <span className="flex items-center gap-1">
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              {paciente.activo ? 'Activo' : 'Inactivo'}
+                            </span>
+                          ) : (
+                            paciente.activo ? 'Activo' : 'Inactivo'
+                          )}
+                        </Badge>
+                      </button>
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-muted">
@@ -229,9 +264,24 @@ export default function PacientesPage() {
                       <p className="text-sm text-muted">{paciente.dni}</p>
                     </div>
                   </div>
-                  <Badge variant={paciente.activo ? 'success' : 'default'} size="sm">
-                    {paciente.activo ? 'Activo' : 'Inactivo'}
-                  </Badge>
+                  <button
+                    onClick={(e) => handleToggleEstado(e, paciente.id, paciente.activo)}
+                    disabled={updatingIds.has(paciente.id)}
+                    className="cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={`Cambiar a ${paciente.activo ? 'Inactivo' : 'Activo'}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                  >
+                    <Badge variant={paciente.activo ? 'success' : 'default'} size="sm">
+                      {updatingIds.has(paciente.id) ? (
+                        <span className="flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          {paciente.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      ) : (
+                        paciente.activo ? 'Activo' : 'Inactivo'
+                      )}
+                    </Badge>
+                  </button>
                 </div>
                 
                 <div className="space-y-2 text-sm">

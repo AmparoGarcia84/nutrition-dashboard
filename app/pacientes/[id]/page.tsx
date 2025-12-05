@@ -72,7 +72,8 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
   const { paciente, loading: loadingPaciente, refresh: refreshPaciente, updatePaciente } = usePaciente(resolvedParams.id);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const { medidas, loading: loadingMedidas, refresh: refreshMedidas } = useMedidas(resolvedParams.id);
-  const { biomarcadores, loading: loadingBiomarcadores, refresh: refreshBiomarcadores } = useBiomarcadores(resolvedParams.id);
+  const { biomarcadores, loading: loadingBiomarcadores, refresh: refreshBiomarcadores, toggleTarea } = useBiomarcadores(resolvedParams.id);
+  const [updatingTareas, setUpdatingTareas] = useState<Set<string>>(new Set());
   const { herramientas } = useHerramientas();
   const { asignadas: herramientasAsignadas } = useHerramientasAsignadas(resolvedParams.id);
   const { dietas, loading: loadingDietas, deleteDieta, refresh: refreshDietas } = useDietas(resolvedParams.id);
@@ -104,11 +105,27 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
     : '0';
 
   // Datos para el gráfico de radar de biomarcadores
-  const radarData = (biomarcadores || []).map(bio => ({
-    nombre: BIOMARCADORES_INFO[bio.tipo as keyof typeof BIOMARCADORES_INFO]?.nombre.split(' ')[0] || bio.tipo,
-    valor: bio.porcentaje,
-    fullMark: 100,
-  }));
+  const radarData = (biomarcadores || [])
+    .filter(bio => {
+      // Filtrar biomarcadores válidos con tipo reconocido
+      const info = BIOMARCADORES_INFO[bio.tipo as keyof typeof BIOMARCADORES_INFO];
+      return info && bio.porcentaje != null;
+    })
+    .map(bio => {
+      const info = BIOMARCADORES_INFO[bio.tipo as keyof typeof BIOMARCADORES_INFO];
+      // Asegurar que el porcentaje sea un número válido entre 0 y 100
+      const porcentaje = typeof bio.porcentaje === 'number' 
+        ? Math.max(0, Math.min(100, bio.porcentaje))
+        : typeof bio.porcentaje === 'string'
+        ? Math.max(0, Math.min(100, parseFloat(bio.porcentaje) || 0))
+        : 0;
+      
+      return {
+        nombre: info?.nombre.split(' ')[0] || bio.tipo,
+        valor: porcentaje,
+        fullMark: 100,
+      };
+    });
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -706,18 +723,52 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
                           Tareas ({(bio.tareas as any[]).filter((t: any) => t.completada).length}/{bio.tareas.length})
                         </p>
                         <ul className="space-y-1.5">
-                          {(bio.tareas as any[]).slice(0, 3).map((tarea: any) => (
-                            <li key={tarea.id} className="flex items-start gap-2 text-xs">
-                              <span className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                                tarea.completada ? 'bg-primary text-white' : 'bg-muted-light text-muted'
-                              }`}>
-                                {tarea.completada && <Check className="w-2.5 h-2.5" />}
-                              </span>
-                              <span className={`${tarea.completada ? 'line-through text-muted' : 'text-foreground'}`}>
-                                {tarea.descripcion}
-                              </span>
-                            </li>
-                          ))}
+                          {(bio.tareas as any[]).slice(0, 3).map((tarea: any) => {
+                            const tareaKey = `${bio.id}-${tarea.id}`;
+                            const isUpdating = updatingTareas.has(tareaKey);
+                            return (
+                              <li 
+                                key={tarea.id} 
+                                className="flex items-start gap-2 text-xs"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  onClick={async (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    
+                                    setUpdatingTareas(prev => new Set(prev).add(tareaKey));
+                                    
+                                    const success = await toggleTarea(bio.id, tarea.id);
+                                    
+                                    setUpdatingTareas(prev => {
+                                      const newSet = new Set(prev);
+                                      newSet.delete(tareaKey);
+                                      return newSet;
+                                    });
+                                    
+                                    if (!success) {
+                                      console.error('Error al actualizar la tarea');
+                                    }
+                                  }}
+                                  disabled={isUpdating}
+                                  className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                                    tarea.completada ? 'bg-primary text-white hover:bg-primary-dark' : 'bg-muted-light text-muted hover:bg-muted'
+                                  }`}
+                                  title={tarea.completada ? 'Marcar como pendiente' : 'Marcar como completada'}
+                                >
+                                  {isUpdating ? (
+                                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                  ) : tarea.completada ? (
+                                    <Check className="w-2.5 h-2.5" />
+                                  ) : null}
+                                </button>
+                                <span className={`${tarea.completada ? 'line-through text-muted' : 'text-foreground'}`}>
+                                  {tarea.descripcion}
+                                </span>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     )}
