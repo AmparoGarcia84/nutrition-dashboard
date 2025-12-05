@@ -34,7 +34,7 @@ export function useHerramientas() {
   const createHerramienta = async (herramienta: Omit<Herramienta, 'id' | 'created_at'>): Promise<Herramienta | null> => {
     const { data, error } = await supabase
       .from('herramientas')
-      .insert(herramienta)
+      .insert(herramienta as any)
       .select()
       .single();
 
@@ -50,6 +50,7 @@ export function useHerramientas() {
   const updateHerramienta = async (id: string, updates: Partial<Herramienta>): Promise<boolean> => {
     const { error } = await supabase
       .from('herramientas')
+      // @ts-ignore - Supabase type inference issue with Database generic
       .update(updates)
       .eq('id', id);
 
@@ -126,6 +127,7 @@ export function useHerramientasAsignadas(pacienteId: string) {
   const asignarHerramienta = async (herramientaId: string): Promise<boolean> => {
     const { error } = await supabase
       .from('herramientas_asignadas')
+      // @ts-ignore - Supabase type inference issue with Database generic
       .insert({
         herramienta_id: herramientaId,
         paciente_id: pacienteId,
@@ -161,6 +163,7 @@ export function useHerramientasAsignadas(pacienteId: string) {
   const marcarVisto = async (herramientaId: string): Promise<boolean> => {
     const { error } = await supabase
       .from('herramientas_asignadas')
+      // @ts-ignore - Supabase type inference issue with Database generic
       .update({ visto: true })
       .eq('herramienta_id', herramientaId)
       .eq('paciente_id', pacienteId);

@@ -38,6 +38,7 @@ export interface Database {
           medicamentos: Json;
           trabajo: Json | null;
           estres: Json | null;
+          foto_perfil: string | null;
           activo: boolean;
           created_at: string;
           updated_at: string;

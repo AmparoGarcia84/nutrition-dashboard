@@ -2,43 +2,44 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { Medida, MedidaInsert, Database } from '@/types/database';
+import type { Dieta } from '@/types/database';
 
-export function useMedidas(pacienteId: string) {
-  const [medidas, setMedidas] = useState<Medida[]>([]);
+export type DietaInsert = Omit<Dieta, 'id' | 'created_at'>;
+
+export function useDietas(pacienteId: string) {
+  const [dietas, setDietas] = useState<Dieta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMedidas = useCallback(async () => {
+  const fetchDietas = useCallback(async () => {
     if (!pacienteId) return;
     
     setLoading(true);
     setError(null);
     
     const { data, error } = await supabase
-      .from('medidas')
+      .from('dietas')
       .select('*')
       .eq('paciente_id', pacienteId)
-      .order('fecha', { ascending: false });
+      .order('fecha_inicio', { ascending: false });
 
     if (error) {
       setError(error.message);
-      setMedidas([]);
+      setDietas([]);
     } else {
-      setMedidas(data || []);
+      setDietas(data || []);
     }
     setLoading(false);
   }, [pacienteId]);
 
   useEffect(() => {
-    fetchMedidas();
-  }, [fetchMedidas]);
+    fetchDietas();
+  }, [fetchDietas]);
 
-  const createMedida = async (medida: MedidaInsert): Promise<Medida | null> => {
+  const createDieta = async (dieta: DietaInsert): Promise<Dieta | null> => {
     const { data, error } = await supabase
-      .from('medidas')
-      // @ts-ignore - Supabase type inference issue with Database generic
-      .insert(medida)
+      .from('dietas')
+      .insert(dieta as any)
       .select()
       .single();
 
@@ -47,13 +48,13 @@ export function useMedidas(pacienteId: string) {
       return null;
     }
 
-    setMedidas(prev => [data, ...prev]);
+    setDietas(prev => [data, ...prev]);
     return data;
   };
 
-  const updateMedida = async (id: string, updates: Partial<MedidaInsert>): Promise<boolean> => {
+  const updateDieta = async (id: string, updates: Partial<DietaInsert>): Promise<boolean> => {
     const { error } = await supabase
-      .from('medidas')
+      .from('dietas')
       // @ts-ignore - Supabase type inference issue with Database generic
       .update(updates)
       .eq('id', id);
@@ -63,15 +64,15 @@ export function useMedidas(pacienteId: string) {
       return false;
     }
 
-    setMedidas(prev => 
-      prev.map(m => m.id === id ? { ...m, ...updates } : m)
+    setDietas(prev => 
+      prev.map(d => d.id === id ? { ...d, ...updates } : d)
     );
     return true;
   };
 
-  const deleteMedida = async (id: string): Promise<boolean> => {
+  const deleteDieta = async (id: string): Promise<boolean> => {
     const { error } = await supabase
-      .from('medidas')
+      .from('dietas')
       .delete()
       .eq('id', id);
 
@@ -80,18 +81,18 @@ export function useMedidas(pacienteId: string) {
       return false;
     }
 
-    setMedidas(prev => prev.filter(m => m.id !== id));
+    setDietas(prev => prev.filter(d => d.id !== id));
     return true;
   };
 
   return {
-    medidas,
+    dietas,
     loading,
     error,
-    refresh: fetchMedidas,
-    createMedida,
-    updateMedida,
-    deleteMedida,
+    refresh: fetchDietas,
+    createDieta,
+    updateDieta,
+    deleteDieta,
   };
 }
 

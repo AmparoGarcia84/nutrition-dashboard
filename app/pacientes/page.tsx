@@ -132,9 +132,17 @@ export default function PacientesPage() {
                   >
                     <td className="px-6 py-4">
                       <Link href={`/pacientes/${paciente.id}`} className="flex items-center gap-3 group">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold">
-                          {paciente.nombre.charAt(0)}
-                        </div>
+                        {paciente.foto_perfil ? (
+                          <img 
+                            src={paciente.foto_perfil} 
+                            alt={paciente.nombre}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold">
+                            {paciente.nombre.charAt(0)}
+                          </div>
+                        )}
                         <div>
                           <p className="font-medium text-foreground group-hover:text-primary transition-colors">
                             {paciente.nombre}
@@ -205,9 +213,17 @@ export default function PacientesPage() {
               <Card hover className="h-full">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold text-lg">
-                      {paciente.nombre.charAt(0)}
-                    </div>
+                    {paciente.foto_perfil ? (
+                      <img 
+                        src={paciente.foto_perfil} 
+                        alt={paciente.nombre}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold text-lg">
+                        {paciente.nombre.charAt(0)}
+                      </div>
+                    )}
                     <div>
                       <p className="font-semibold text-foreground">{paciente.nombre}</p>
                       <p className="text-sm text-muted">{paciente.dni}</p>

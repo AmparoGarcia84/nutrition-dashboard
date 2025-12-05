@@ -34,7 +34,7 @@ export function usePacientes() {
   const createPaciente = async (paciente: PacienteInsert): Promise<Paciente | null> => {
     const { data, error } = await supabase
       .from('pacientes')
-      .insert(paciente)
+      .insert(paciente as any)
       .select()
       .single();
 
@@ -50,7 +50,7 @@ export function usePacientes() {
   const updatePaciente = async (id: string, updates: Partial<PacienteInsert>): Promise<boolean> => {
     const { error } = await supabase
       .from('pacientes')
-      .update(updates)
+      .update(updates as any)
       .eq('id', id);
 
     if (error) {
@@ -95,26 +95,49 @@ export function usePaciente(id: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetch() {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('pacientes')
-        .select('*')
-        .eq('id', id)
-        .single();
+  const fetchPaciente = useCallback(async () => {
+    if (!id) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    const { data, error } = await supabase
+      .from('pacientes')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-      if (error) {
-        setError(error.message);
-      } else {
-        setPaciente(data);
-      }
-      setLoading(false);
+    if (error) {
+      setError(error.message);
+      setPaciente(null);
+    } else {
+      setPaciente(data);
     }
-
-    if (id) fetch();
+    setLoading(false);
   }, [id]);
 
-  return { paciente, loading, error };
+  useEffect(() => {
+    fetchPaciente();
+  }, [fetchPaciente]);
+
+  const updatePaciente = async (updates: Partial<PacienteInsert>): Promise<boolean> => {
+    if (!id) return false;
+    
+    const { error } = await supabase
+      .from('pacientes')
+      .update(updates as any)
+      .eq('id', id);
+
+    if (error) {
+      setError(error.message);
+      return false;
+    }
+
+    // Refrescar los datos
+    await fetchPaciente();
+    return true;
+  };
+
+  return { paciente, loading, error, refresh: fetchPaciente, updatePaciente };
 }
 

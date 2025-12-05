@@ -124,9 +124,17 @@ export default function Dashboard() {
                   className="flex items-center gap-4 p-4 rounded-xl hover:bg-background transition-colors group"
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-white font-semibold text-lg">
-                    {paciente.nombre.charAt(0)}
-                  </div>
+                  {paciente.foto_perfil ? (
+                    <img 
+                      src={paciente.foto_perfil} 
+                      alt={paciente.nombre}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-white font-semibold text-lg">
+                      {paciente.nombre.charAt(0)}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground group-hover:text-primary transition-colors">
                       {paciente.nombre}

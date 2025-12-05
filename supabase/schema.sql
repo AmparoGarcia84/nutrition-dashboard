@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS pacientes (
   medicamentos JSONB DEFAULT '[]',
   trabajo JSONB DEFAULT '{"activo": false, "tipo": "", "horario": ""}',
   estres JSONB DEFAULT '{"nivel": 0, "motivo": "", "afectaSalud": ""}',
+  foto_perfil TEXT,
   activo BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

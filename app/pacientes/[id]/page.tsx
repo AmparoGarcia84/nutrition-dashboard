@@ -3,7 +3,7 @@
 import { use, useState } from 'react';
 import Link from 'next/link';
 import { Card, Button, Badge } from '@/components/ui';
-import { usePaciente, useMedidas, useBiomarcadores, useHerramientas, useHerramientasAsignadas } from '@/lib/hooks';
+import { usePaciente, useMedidas, useBiomarcadores, useHerramientas, useHerramientasAsignadas, useDietas } from '@/lib/hooks';
 import { BIOMARCADORES_INFO } from '@/types';
 import { formatDate, calcularEdad } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
@@ -24,7 +24,12 @@ import {
   Check,
   ChevronRight,
   Scale,
-  Ruler
+  Ruler,
+  Trash2,
+  Eye,
+  Flame,
+  Camera,
+  Upload
 } from 'lucide-react';
 import GeneradorDietas from '@/components/dietas/GeneradorDietas';
 import FormMedida from '@/components/medidas/FormMedida';
@@ -48,27 +53,29 @@ import {
 } from 'recharts';
 
 const tabs = [
+  { id: 'biomarcadores', label: 'Biomarcadores', icon: Heart },
   { id: 'dietas', label: 'Dietas', icon: Utensils },
   { id: 'medidas', label: 'Medidas', icon: Activity },
-  { id: 'biomarcadores', label: 'Biomarcadores', icon: Heart },
   { id: 'documentos', label: 'Documentos', icon: FileText },
   { id: 'herramientas', label: 'Herramientas', icon: BookOpen },
 ];
 
 export default function PacienteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const [activeTab, setActiveTab] = useState('medidas');
+  const [activeTab, setActiveTab] = useState('biomarcadores');
   const [medidaSeccion, setMedidaSeccion] = useState<'bioimpedancia' | 'segmental' | 'plicometria' | 'antropometria'>('bioimpedancia');
   const [showFormMedida, setShowFormMedida] = useState(false);
   const [showFormBiomarcador, setShowFormBiomarcador] = useState(false);
   const [editingBiomarcadorId, setEditingBiomarcadorId] = useState<string | null>(null);
   const [showAsignarHerramientas, setShowAsignarHerramientas] = useState(false);
   
-  const { paciente, loading: loadingPaciente } = usePaciente(resolvedParams.id);
+  const { paciente, loading: loadingPaciente, refresh: refreshPaciente, updatePaciente } = usePaciente(resolvedParams.id);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const { medidas, loading: loadingMedidas, refresh: refreshMedidas } = useMedidas(resolvedParams.id);
   const { biomarcadores, loading: loadingBiomarcadores, refresh: refreshBiomarcadores } = useBiomarcadores(resolvedParams.id);
   const { herramientas } = useHerramientas();
   const { asignadas: herramientasAsignadas } = useHerramientasAsignadas(resolvedParams.id);
+  const { dietas, loading: loadingDietas, deleteDieta, refresh: refreshDietas } = useDietas(resolvedParams.id);
 
   if (loadingPaciente) {
     return (
@@ -121,8 +128,53 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
         <div className="relative flex flex-col md:flex-row gap-6">
           {/* Avatar and basic info */}
           <div className="flex items-start gap-4">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-primary/30">
-              {paciente.nombre.charAt(0)}
+            <div className="relative group">
+              {paciente.foto_perfil ? (
+                <img 
+                  src={paciente.foto_perfil} 
+                  alt={paciente.nombre}
+                  className="w-20 h-20 rounded-2xl object-cover shadow-lg shadow-primary/30"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-primary/30">
+                  {paciente.nombre.charAt(0)}
+                </div>
+              )}
+              <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    setUploadingPhoto(true);
+                    try {
+                      // Convertir a base64 para guardar directamente
+                      const reader = new FileReader();
+                      reader.onloadend = async () => {
+                        const base64String = reader.result as string;
+                        const success = await updatePaciente({ foto_perfil: base64String });
+                        if (success) {
+                          await refreshPaciente();
+                        }
+                        setUploadingPhoto(false);
+                      };
+                      reader.readAsDataURL(file);
+                    } catch (err) {
+                      console.error('Error subiendo foto:', err);
+                      setUploadingPhoto(false);
+                    }
+                  }}
+                  disabled={uploadingPhoto}
+                />
+                {uploadingPhoto ? (
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                ) : (
+                  <Camera className="w-5 h-5 text-white" />
+                )}
+              </label>
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">{paciente.nombre}</h1>
@@ -135,39 +187,39 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
 
           {/* Contact info */}
           <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="flex items-center gap-3 text-sm">
-              <div className="w-10 h-10 rounded-xl bg-primary-light/50 flex items-center justify-center">
+            <div className="flex items-start gap-3 text-sm">
+              <div className="w-10 h-10 rounded-xl bg-primary-light/50 flex items-center justify-center flex-shrink-0">
                 <Mail className="w-5 h-5 text-primary" />
               </div>
-              <div>
-                <p className="text-muted text-xs">Email</p>
-                <p className="text-foreground font-medium">{paciente.email}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-muted text-xs mb-1">Email</p>
+                <p className="text-foreground font-medium break-words break-all">{paciente.email}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 text-sm">
-              <div className="w-10 h-10 rounded-xl bg-secondary-light/50 flex items-center justify-center">
+            <div className="flex items-start gap-3 text-sm">
+              <div className="w-10 h-10 rounded-xl bg-secondary-light/50 flex items-center justify-center flex-shrink-0">
                 <Phone className="w-5 h-5 text-secondary" />
               </div>
-              <div>
-                <p className="text-muted text-xs">Teléfono</p>
-                <p className="text-foreground font-medium">{paciente.telefono}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-muted text-xs mb-1">Teléfono</p>
+                <p className="text-foreground font-medium break-words">{paciente.telefono}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 text-sm">
-              <div className="w-10 h-10 rounded-xl bg-accent-light/50 flex items-center justify-center">
+            <div className="flex items-start gap-3 text-sm">
+              <div className="w-10 h-10 rounded-xl bg-accent-light/50 flex items-center justify-center flex-shrink-0">
                 <MapPin className="w-5 h-5 text-accent" />
               </div>
-              <div>
-                <p className="text-muted text-xs">Localidad</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-muted text-xs mb-1">Localidad</p>
                 <p className="text-foreground font-medium">{paciente.localidad || 'Sin localidad'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 text-sm">
-              <div className="w-10 h-10 rounded-xl bg-primary-light/50 flex items-center justify-center">
+            <div className="flex items-start gap-3 text-sm">
+              <div className="w-10 h-10 rounded-xl bg-primary-light/50 flex items-center justify-center flex-shrink-0">
                 <Calendar className="w-5 h-5 text-primary" />
               </div>
-              <div>
-                <p className="text-muted text-xs">Edad</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-muted text-xs mb-1">Edad</p>
                 <p className="text-foreground font-medium">{calcularEdad(paciente.fecha_nacimiento)} años</p>
               </div>
             </div>
@@ -224,10 +276,116 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
       <div className="animate-fade-in">
         {/* Dietas Tab */}
         {activeTab === 'dietas' && (
-          <GeneradorDietas 
-            pacienteId={paciente.id} 
-            pacienteNombre={paciente.nombre} 
-          />
+          <div className="space-y-6">
+            {/* Lista de dietas guardadas */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-foreground">Dietas Guardadas</h2>
+                <Badge variant="secondary">{dietas.length} {dietas.length === 1 ? 'dieta' : 'dietas'}</Badge>
+              </div>
+
+              {loadingDietas ? (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : dietas.length === 0 ? (
+                <Card>
+                  <div className="text-center py-8">
+                    <Utensils className="w-12 h-12 text-muted mx-auto mb-3" />
+                    <p className="text-muted">No hay dietas guardadas aún</p>
+                    <p className="text-sm text-muted mt-1">Genera y guarda tu primera dieta</p>
+                  </div>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {dietas.map((dieta) => {
+                    const comidas = Array.isArray(dieta.comidas) ? dieta.comidas : [];
+                    const totalComidas = comidas.length;
+                    const fechaInicio = new Date(dieta.fecha_inicio);
+                    const fechaFin = dieta.fecha_fin ? new Date(dieta.fecha_fin) : null;
+                    const diasDuracion = fechaFin 
+                      ? Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24))
+                      : 1;
+
+                    return (
+                      <Card key={dieta.id} className="hover:shadow-lg transition-shadow">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-foreground mb-1">{dieta.nombre}</h3>
+                            <div className="flex items-center gap-2 text-xs text-muted">
+                              <Calendar className="w-3 h-3" />
+                              <span>{formatDate(dieta.fecha_inicio)}</span>
+                              {fechaFin && (
+                                <>
+                                  <span>—</span>
+                                  <span>{formatDate(dieta.fecha_fin)}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              if (confirm('¿Estás seguro de que quieres eliminar esta dieta?')) {
+                                await deleteDieta(dieta.id);
+                                refreshDietas();
+                              }
+                            }}
+                            className="text-danger hover:text-danger hover:bg-danger-light"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <Flame className="w-4 h-4 text-accent" />
+                              <span className="text-foreground font-medium">{dieta.calorias} kcal/día</span>
+                            </div>
+                            <Badge variant="secondary">{diasDuracion} {diasDuracion === 1 ? 'día' : 'días'}</Badge>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs text-muted">
+                            <Utensils className="w-3 h-3" />
+                            <span>{totalComidas} {totalComidas === 1 ? 'comida' : 'comidas'}</span>
+                          </div>
+
+                          {dieta.notas && (
+                            <p className="text-xs text-muted line-clamp-2">{dieta.notas}</p>
+                          )}
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full gap-2"
+                            onClick={() => {
+                              // Aquí podrías abrir un modal o navegar a una vista detallada
+                              alert('Vista detallada de dieta - Próximamente');
+                            }}
+                          >
+                            <Eye className="w-4 h-4" />
+                            Ver detalles
+                          </Button>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Generador de dietas */}
+            <div>
+              <h2 className="text-xl font-semibold text-foreground mb-4">Generar Nueva Dieta</h2>
+              <GeneradorDietas 
+                pacienteId={paciente.id} 
+                pacienteNombre={paciente.nombre}
+                onDietaGuardada={refreshDietas}
+              />
+            </div>
+          </div>
         )}
 
         {/* Medidas Tab */}

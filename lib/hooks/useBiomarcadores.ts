@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { Biomarcador, BiomarcadorInsert } from '@/types/database';
-
+import type { Biomarcador, BiomarcadorInsert, Database } from '@/types/database';
 export function useBiomarcadores(pacienteId: string) {
   const [biomarcadores, setBiomarcadores] = useState<Biomarcador[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +36,7 @@ export function useBiomarcadores(pacienteId: string) {
   const createBiomarcador = async (biomarcador: BiomarcadorInsert): Promise<Biomarcador | null> => {
     const { data, error } = await supabase
       .from('biomarcadores')
+      // @ts-ignore - Supabase type inference issue with Database generic
       .insert(biomarcador)
       .select()
       .single();
@@ -53,6 +53,7 @@ export function useBiomarcadores(pacienteId: string) {
   const updateBiomarcador = async (id: string, updates: Partial<BiomarcadorInsert>): Promise<boolean> => {
     const { error } = await supabase
       .from('biomarcadores')
+      // @ts-ignore - Supabase type inference issue with Database generic
       .update(updates)
       .eq('id', id);
 
